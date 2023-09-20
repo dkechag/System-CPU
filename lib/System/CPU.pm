@@ -4,38 +4,117 @@ use 5.006;
 use strict;
 use warnings;
 
+use List::Util qw(sum);
+
 =head1 NAME
 
-System::CPU - The great new System::CPU!
+System::CPU - Cross-platform CPU information / topology with no dependencies
 
 =head1 VERSION
 
-Version 0.01
+Version 0.0_1
 
 =cut
 
-our $VERSION = '0.01';
-
+our $VERSION = '0.0_1';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
+ use System::CPU;
 
-Perhaps a little code snippet.
+ # Number of logical cores. E.g. on SMT systems this will be the num of Hyper-Threads
+ my $logical_cpu = System::CPU::get_ncpu();
 
-    use System::CPU;
+ # For some platforms you can separately get the number of processors/sockets and cores
+ my ($phys_processors, $phys_cpu, $logical_cpu) = System::CPU::get_cpu();
 
-    my $foo = System::CPU->new();
-    ...
+ # Model name of the CPU
+ my $name = System::CPU::get_name();
 
-=head1 EXPORT
+ # CPU Architecture
+ my $arch = System::CPU::get_arch();
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+=head1 DESCRIPTION
 
-=head1 SUBROUTINES/METHODS
+A pure Perl module with no dependencies to get basic CPU information on any platform.
+The data you can get differs depending on platform, but for many systems running
+Linux/BSD/MacOS you can get extra nuance like number of threads vs cores etc.
 
-=head2 function1
+It was created for L<Benchmarking::DKbench> with the C<get_ncpu> function modeled
+after the one on L<MCE::Util>. In fact, some code was copied from that function as
+it had the most reliable way to consistently get the logical cpus of the system.
+
+=head1 FUNCTIONS
+
+=head2 get_cpu
+
+Returns as detailed CPU topology as the platform allows. A list of three values
+will be returned, the first and the second possibly C<undef>:
+
+ my ($phys_processors, $phys_cpu, $logical_cpu) = System::CPU::get_cpu();
+
+For many Linux systems, the number of physical processors (sockets), as well as
+the number of physical CPU cores and logical CPUs (CPU threads) will be returned.
+
+For MacOS and BSD, the physical processors (sockets) will be C<undef>, but the
+cores vs threads numbers should still be available for most systems.
+
+For the systems where the extra information is not available (i.e. all other OSes),
+the first two values will be C<undef>.
+
+=head2 get_ncpu
+
+ my $logical_cpus = System::CPU::get_ncpu();
+
+This function behaves very similar to C<MCE::Util::get_ncpu> - in fact code is borrowed
+from it. The number of logical CPUs will be return, this is the number of threads
+for SMT systems and the number of cores for most others.
+
+=head2 get_name
+
+ my $cpu_name = System::CPU::get_name(raw => $raw?);
+
+Returns the CPU model name. By default it will remove some extra spaces and Intel's
+(TM) and (R), but you can pass in the C<raw> argument if you do not want that.
+
+=head2 get_arch
+
+ my $arch = System::CPU::get_arch();
+
+Will return the CPU architecture as reported by the system. There is no standarized
+form, e.g. Linux will report aarch64 on a system where Darwin would report arm64
+etc.
+
+=head1 CAVEATS
+
+Since text output from commands is parsed for most platforms, only the English
+language locales are supported.
+
+=head1 NOTES
+
+I did try to use existing solutions before writing my own. L<Sys::Info> has issues
+installing on modern Linux systems (I tried submitting a PR, but the author seems
+unresponsive).
+
+L<System::Info> is the most promising, however, it returns a simple "core" count which
+seems to inconsistently be either physical cores or threads depending on the platform.
+The author got back to me, so I will try to sort that out, as that module is more
+generic than System::CPU.
+
+There are also several platform-specific modules, most requiring a compiler too
+(e.g. L<Unix::Processors>, L<Sys::Info>, various C<*::Sysinfo>).
+
+In the end, I wanted to get the CPU topology where possible - number of processors/sockets,
+cores, threads separately, something that wasn't readily available.
+
+I intend to support all systems possible with this simple pure Perl module. If you
+have access to a system that is not supported or where the module cannot currently
+give you the correct output, feel free to contact me about extending support.
+
+Currently supported systems:
+
+Linux/Android, BSD/MacOS, Win32/Cygwin, AIX, Solaris, IRIX, HP-UX, Haiku, GNU
+and variants of those.
 
 =cut
 
@@ -46,9 +125,11 @@ sub get_cpu {
     return _aix_cpu() if $^O =~ /aix/i;
     return _gnu_cpu() if $^O =~ /gnu/i;
     return _haiku_cpu() if $^O =~ /haiku/i;
+    return _hpux_cpu() if $^O =~ /hp-?ux/i;
     return _irix_cpu() if $^O =~ /irix/i;
     return (undef, undef, $ENV{NUMBER_OF_PROCESSORS}) if $^O =~ /mswin|mingw|msys|cygwin/i;
-    return (undef, undef, grep { /^processor/ } `ioscan -fkC processor 2>/dev/null`) if $^O =~ /hp-?ux/i;
+
+    die "OS identifier '$^O' not recognized. Contact dkechag\@cpan.org to add support.";
 }
 
 sub get_ncpu {
@@ -57,11 +138,40 @@ sub get_ncpu {
 }
 
 sub get_name {
-    if ($^O =~ /linux|android/) {
-        my ($name) = _proc_cpuinfo();
-        return $name;
+    my %opt = @_;
+    my $name;
+    if ($^O =~ /linux|android/i) {
+        ($name) = _proc_cpuinfo();
+    } elsif ($^O =~ /bsd|darwin|dragonfly/i) {
+        chomp( $name = `sysctl -n machdep.cpu.brand_string 2>/dev/null` );
+        chomp( $name = `sysctl -n hw.model 2>/dev/null` ) unless $name;
+    } elsif ($^O =~ /mswin|mingw|msys|cygwin/i) {
+        $name = $ENV{PROCESSOR_IDENTIFIER};
+    } elsif ($^O =~ /aix/i) {
+        chomp( my $out = `prtconf | grep -i "Processor Type" 2>/dev/null` );
+        $name = $1 if $out =~/:\s*(.*)/;
+    } elsif ($^O =~ /irix/i) {
+        my @out = grep {/CPU:/i} `hinv 2>/dev/null`;
+        $name = $1 if @out && $out[0] =~ /CPU:\s*(.*)/i;
+    } elsif ($^O =~ /haiku/i) {
+        my $out = `sysinfo -cpu 2>/dev/null | grep "^CPU #"`;
+        $name = $1 if $out =~/:\s*(?:")?(.*?)(?:")?\s*$/m;
+    } elsif ($^O =~ /hp-?ux/i) {
+        my $out = `machinfo`;
+        if ($out =~ /processor model:\s*\d*\s*(.+?)$/im) {
+            $name = $1
+        } elsif ($out =~ /\s*\d*\s*(.+(?:MHz|GHz).+)$/m) {
+            $name = $1;
+        }
+    } else {
+        die "OS identifier '$^O' not recognized. Contact dkechag\@cpan.org to add support.";
     }
-    return $ENV{PROCESSOR_IDENTIFIER} if $^O =~ /mswin|mingw|msys|cygwin/i;
+
+    unless ($opt{raw}) {
+        $name =~ s/\s+/ /g if $name;         # I don't like some systems giving excess whitespace.
+        $name =~ s/\((?:R|TM)\)//g if $name; # I don't like Intel's (R)s and (TM)s
+    }
+    return $name || "";
 }
 
 sub get_arch {
@@ -69,6 +179,8 @@ sub get_arch {
     return $ENV{PROCESSOR_ARCHITECTURE} if $^O =~ /mswin|mingw|msys|cygwin/i;
     return _uname_p() if $^O =~ /aix|irix/i;
     return _getarch() if $^O =~ /haiku/i;
+
+    die "OS identifier '$^O' not recognized. Contact dkechag\@cpan.org to add support.";
 }
 
 sub _solaris_cpu {
@@ -80,13 +192,13 @@ sub _solaris_cpu {
         my @output = grep {/^NumCPU = \d+/} `uname -X 2>/dev/null`;
         $ncpu = (split ' ', $output[0])[2] if @output;
     }
-    return $ncpu;
+    return (undef, undef, $ncpu);
 }
 
 sub _bsd_cpu {
     chomp( my $cpus = `sysctl -n hw.ncpu 2>/dev/null` );
     chomp( $cpus = `sysctl -n hw.logicalcpu_max 2>/dev/null` ) unless $cpus;
-    return unless $cpus;
+    return (undef, undef, undef) unless $cpus;
     chomp( my $cores = `sysctl -n hw.physicalcpu_max 2>/dev/null` );
     $cores ||= $cpus;
     return (undef, $cores, $cpus);
@@ -120,21 +232,26 @@ sub _haiku_cpu {
     my $ncpu;
     my @output = `sysinfo -cpu 2>/dev/null | grep "^CPU #"`;
     $ncpu = scalar @output if @output;
-    return $ncpu;
+    return (undef, undef, $ncpu);;
+}
+
+sub _hpux_cpu {
+    my $ncpu = grep { /^processor/ } `ioscan -fkC processor 2>/dev/null`;
+    return (undef, undef, $ncpu || undef);
 }
 
 sub _irix_cpu {
     my $ncpu;
     my @out = grep {/\s+processors?$/i} `hinv -c processor 2>/dev/null`;
     $ncpu = (split ' ', $out[0])[0] if @out;
-    return $ncpu;
+    return (undef, undef, $ncpu);;
 }
 
 sub _gnu_cpu {
     my $ncpu;
     chomp(my @output = `nproc --all 2>/dev/null`);
     $ncpu = $output[0] if @output;
-    return $ncpu;
+    return (undef, undef, $ncpu);;
 }
 
 sub _proc_cpuinfo {
@@ -179,31 +296,23 @@ Dimitrios Kechagias, C<< <dkechag at cpan.org> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-system-cpu at rt.cpan.org>, or through
-the web interface at L<https://rt.cpan.org/NoAuth/ReportBug.html?Queue=System-CPU>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
+Please report any bugs or feature requests to L<https://github.com/dkechag/System-CPU/issues>.
 
-
-
+You can also submit PRs with fixes/enhancements directly.
 
 =head1 SUPPORT
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc System::CPU
-
+ perldoc System::CPU
 
 You can also look for information at:
 
 =over 4
 
-=item * RT: CPAN's request tracker (report bugs here)
+=item * GitHub
 
-L<https://rt.cpan.org/NoAuth/Bugs.html?Dist=System-CPU>
-
-=item * GitHub issue tracker
-
-L<https://github.com/dkechag/System-CPU/issues>
+L<https://github.com/dkechag/System-CPU>
 
 =item * Search CPAN
 
@@ -211,9 +320,9 @@ L<https://metacpan.org/release/System-CPU>
 
 =back
 
-
 =head1 ACKNOWLEDGEMENTS
 
+Some code borrowed from L<MCE>.
 
 =head1 LICENSE AND COPYRIGHT
 
@@ -221,7 +330,6 @@ This software is copyright (c) 2023 by Dimitrios Kechagias.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
-
 
 =cut
 

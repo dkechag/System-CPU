@@ -3,27 +3,39 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
+# Optional except for cpancover, cpantesters etc.
+my $extra_test =
+  ( $ENV{EXTENDED_TESTING} || $ENV{AUTOMATED_TESTING} )
+  ? 'requires'
+  : 'recommends';
+
 my %WriteMakefileArgs = (
     NAME             => 'System::CPU',
     AUTHOR           => q{Dimitrios Kechagias <dkechag@cpan.org>},
     VERSION_FROM     => 'lib/System/CPU.pm',
     ABSTRACT_FROM    => 'lib/System/CPU.pm',
     LICENSE          => 'perl_5',
-    MIN_PERL_VERSION => '5.006',
+    MIN_PERL_VERSION => '5.008',
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => '0',
     },
     TEST_REQUIRES => {
-        'Test::More' => '0',
+        'Test2::V0'      => '0',
+        'Test::MockFile' => '0',
     },
     PREREQ_PM => {
-        #'ABC'              => '1.6',
-        #'Foo::Bar::Module' => '5.0401',
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'System-CPU-*' },
     META_MERGE => {
         'meta-spec' => { version => 2 },
+        prereqs => {
+            test => {
+                $extra_test => {
+                    'Test::MockFile' => '0',
+                }
+            },
+        },
         resources   => {
             repository => {
                 type => 'git',
