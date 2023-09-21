@@ -4,7 +4,7 @@ System::CPU - Cross-platform CPU information / topology with no dependencies
 
 # VERSION
 
-Version 0.01
+Version 1.00
 
 # SYNOPSIS
 
@@ -55,7 +55,7 @@ the first two values will be `undef`.
     my $logical_cpus = System::CPU::get_ncpu();
 
 This function behaves very similar to `MCE::Util::get_ncpu` - in fact code is borrowed
-from it. The number of logical CPUs will be return, this is the number of threads
+from it. The number of logical CPUs will be returned, this is the number of hyper-threads
 for SMT systems and the number of cores for most others.
 
 ## get\_name
@@ -63,7 +63,7 @@ for SMT systems and the number of cores for most others.
     my $cpu_name = System::CPU::get_name(raw => $raw?);
 
 Returns the CPU model name. By default it will remove some extra spaces and Intel's
-(TM) and (R), but you can pass in the `raw` argument if you do not want that.
+(TM) and (R), but you can pass in the `raw` argument to avoid this cleanup.
 
 ## get\_arch
 
@@ -75,7 +75,7 @@ etc.
 
 # CAVEATS
 
-Since text output from commands is parsed for most platforms, only the English
+Since text output from user commands is parsed for most platforms, only the English
 language locales are supported.
 
 # NOTES

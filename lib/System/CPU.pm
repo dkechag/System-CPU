@@ -12,11 +12,11 @@ System::CPU - Cross-platform CPU information / topology with no dependencies
 
 =head1 VERSION
 
-Version 0.0_1
+Version 1.00
 
 =cut
 
-our $VERSION = '0.0_1';
+our $VERSION = '1.00';
 
 =head1 SYNOPSIS
 
@@ -67,7 +67,7 @@ the first two values will be C<undef>.
  my $logical_cpus = System::CPU::get_ncpu();
 
 This function behaves very similar to C<MCE::Util::get_ncpu> - in fact code is borrowed
-from it. The number of logical CPUs will be return, this is the number of threads
+from it. The number of logical CPUs will be returned, this is the number of hyper-threads
 for SMT systems and the number of cores for most others.
 
 =head2 get_name
@@ -75,7 +75,7 @@ for SMT systems and the number of cores for most others.
  my $cpu_name = System::CPU::get_name(raw => $raw?);
 
 Returns the CPU model name. By default it will remove some extra spaces and Intel's
-(TM) and (R), but you can pass in the C<raw> argument if you do not want that.
+(TM) and (R), but you can pass in the C<raw> argument to avoid this cleanup.
 
 =head2 get_arch
 
@@ -87,7 +87,7 @@ etc.
 
 =head1 CAVEATS
 
-Since text output from commands is parsed for most platforms, only the English
+Since text output from user commands is parsed for most platforms, only the English
 language locales are supported.
 
 =head1 NOTES
