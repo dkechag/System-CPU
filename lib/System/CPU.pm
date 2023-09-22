@@ -6,26 +6,20 @@ use warnings;
 
 use List::Util qw(sum);
 
+our $VERSION = '1.01';
+
 =head1 NAME
 
-System::CPU - Cross-platform CPU information / topology with no dependencies
-
-=head1 VERSION
-
-Version 1.00
-
-=cut
-
-our $VERSION = '1.00';
+System::CPU - Cross-platform CPU information / topology
 
 =head1 SYNOPSIS
 
  use System::CPU;
 
- # Number of logical cores. E.g. on SMT systems this will be the num of Hyper-Threads
+ # Number of logical cores. E.g. on SMT systems these will be Hyper-Threads
  my $logical_cpu = System::CPU::get_ncpu();
 
- # For some platforms you can separately get the number of processors/sockets and cores
+ # On some platforms you can also get the number of processors and physical cores
  my ($phys_processors, $phys_cpu, $logical_cpu) = System::CPU::get_cpu();
 
  # Model name of the CPU
@@ -40,7 +34,7 @@ A pure Perl module with no dependencies to get basic CPU information on any plat
 The data you can get differs depending on platform, but for many systems running
 Linux/BSD/MacOS you can get extra nuance like number of threads vs cores etc.
 
-It was created for L<Benchmarking::DKbench> with the C<get_ncpu> function modeled
+It was created for L<Benchmark::DKbench> with the C<get_ncpu> function modeled
 after the one on L<MCE::Util>. In fact, some code was copied from that function as
 it had the most reliable way to consistently get the logical cpus of the system.
 
@@ -119,15 +113,16 @@ and variants of those.
 =cut
 
 sub get_cpu {
-    return _linux_cpu() if $^O =~ /linux|android/i;
-    return _bsd_cpu() if $^O =~ /bsd|darwin|dragonfly/i;
+    return _linux_cpu()   if $^O =~ /linux|android/i;
+    return _bsd_cpu()     if $^O =~ /bsd|darwin|dragonfly/i;
     return _solaris_cpu() if $^O =~ /osf|solaris|sunos|svr5|sco/i;
-    return _aix_cpu() if $^O =~ /aix/i;
-    return _gnu_cpu() if $^O =~ /gnu/i;
-    return _haiku_cpu() if $^O =~ /haiku/i;
-    return _hpux_cpu() if $^O =~ /hp-?ux/i;
-    return _irix_cpu() if $^O =~ /irix/i;
-    return (undef, undef, $ENV{NUMBER_OF_PROCESSORS}) if $^O =~ /mswin|mingw|msys|cygwin/i;
+    return _aix_cpu()     if $^O =~ /aix/i;
+    return _gnu_cpu()     if $^O =~ /gnu/i;
+    return _haiku_cpu()   if $^O =~ /haiku/i;
+    return _hpux_cpu()    if $^O =~ /hp-?ux/i;
+    return _irix_cpu()    if $^O =~ /irix/i;
+    return (undef, undef, $ENV{NUMBER_OF_PROCESSORS})
+        if $^O =~ /mswin|mingw|msys|cygwin/i;
 
     die "OS identifier '$^O' not recognized. Contact dkechag\@cpan.org to add support.";
 }
@@ -143,23 +138,23 @@ sub get_name {
     if ($^O =~ /linux|android/i) {
         ($name) = _proc_cpuinfo();
     } elsif ($^O =~ /bsd|darwin|dragonfly/i) {
-        chomp( $name = `sysctl -n machdep.cpu.brand_string 2>/dev/null` );
-        chomp( $name = `sysctl -n hw.model 2>/dev/null` ) unless $name;
+        chomp($name = `sysctl -n machdep.cpu.brand_string 2>/dev/null`);
+        chomp($name = `sysctl -n hw.model 2>/dev/null`) unless $name;
     } elsif ($^O =~ /mswin|mingw|msys|cygwin/i) {
         $name = $ENV{PROCESSOR_IDENTIFIER};
     } elsif ($^O =~ /aix/i) {
-        chomp( my $out = `prtconf | grep -i "Processor Type" 2>/dev/null` );
-        $name = $1 if $out =~/:\s*(.*)/;
+        chomp(my $out = `prtconf | grep -i "Processor Type" 2>/dev/null`);
+        $name = $1 if $out =~ /:\s*(.*)/;
     } elsif ($^O =~ /irix/i) {
         my @out = grep {/CPU:/i} `hinv 2>/dev/null`;
         $name = $1 if @out && $out[0] =~ /CPU:\s*(.*)/i;
     } elsif ($^O =~ /haiku/i) {
         my $out = `sysinfo -cpu 2>/dev/null | grep "^CPU #"`;
-        $name = $1 if $out =~/:\s*(?:")?(.*?)(?:")?\s*$/m;
+        $name = $1 if $out =~ /:\s*(?:")?(.*?)(?:")?\s*$/m;
     } elsif ($^O =~ /hp-?ux/i) {
         my $out = `machinfo`;
         if ($out =~ /processor model:\s*\d*\s*(.+?)$/im) {
-            $name = $1
+            $name = $1;
         } elsif ($out =~ /\s*\d*\s*(.+(?:MHz|GHz).+)$/m) {
             $name = $1;
         }
@@ -168,17 +163,18 @@ sub get_name {
     }
 
     unless ($opt{raw}) {
-        $name =~ s/\s+/ /g if $name;         # I don't like some systems giving excess whitespace.
-        $name =~ s/\((?:R|TM)\)//g if $name; # I don't like Intel's (R)s and (TM)s
+        $name =~ s/\s+/ /g         if $name;    # I don't like some systems giving excess whitespace.
+        $name =~ s/\((?:R|TM)\)//g if $name;    # I don't like Intel's (R)s and (TM)s
     }
     return $name || "";
 }
 
+
 sub get_arch {
     return _uname_m() if $^O =~ /linux|android|bsd|darwin|dragonfly|gnu|osf|solaris|sunos|svr5|sco|hp-?ux/i;
-    return $ENV{PROCESSOR_ARCHITECTURE} if $^O =~ /mswin|mingw|msys|cygwin/i;
     return _uname_p() if $^O =~ /aix|irix/i;
     return _getarch() if $^O =~ /haiku/i;
+    return $ENV{PROCESSOR_ARCHITECTURE} if $^O =~ /mswin|mingw|msys|cygwin/i;
 
     die "OS identifier '$^O' not recognized. Contact dkechag\@cpan.org to add support.";
 }
@@ -196,10 +192,10 @@ sub _solaris_cpu {
 }
 
 sub _bsd_cpu {
-    chomp( my $cpus = `sysctl -n hw.ncpu 2>/dev/null` );
-    chomp( $cpus = `sysctl -n hw.logicalcpu_max 2>/dev/null` ) unless $cpus;
+    chomp(my $cpus = `sysctl -n hw.logicalcpu 2>/dev/null`);
+    chomp($cpus    = `sysctl -n hw.ncpu 2>/dev/null`) unless $cpus; # Old system fallback
     return (undef, undef, undef) unless $cpus;
-    chomp( my $cores = `sysctl -n hw.physicalcpu_max 2>/dev/null` );
+    chomp(my $cores = `sysctl -n hw.physicalcpu 2>/dev/null`);
     $cores ||= $cpus;
     return (undef, $cores, $cpus);
 }
@@ -256,11 +252,11 @@ sub _gnu_cpu {
 
 sub _proc_cpuinfo {
     my (@physical, @cores, $phys, $cpus, $name);
-    if ( -f '/proc/cpuinfo' && open my $fh, '<', '/proc/cpuinfo' ) {
+    if (-f '/proc/cpuinfo' && open my $fh, '<', '/proc/cpuinfo') {
         while (<$fh>) {
             $cpus++ if /^processor\s*:/i;
             push @physical, $1 if /^physical id\s*:\s*(\d+)/i;
-            push @cores, $1 if /^cpu cores\s*:\s*(\d+)/i;
+            push @cores,    $1 if /^cpu cores\s*:\s*(\d+)/i;
             $name = $1 if /^model name\s*:\s*(.*)/i;
         }
         return $name, undef, $cores[0], $cpus if !@physical && @cores;
@@ -268,7 +264,7 @@ sub _proc_cpuinfo {
         my %hash;
         $hash{$physical[$_]} = $_ < scalar(@cores) ? $cores[$_] : $cores[0]
             for 0 .. $#physical;
-        my $phys  = keys %hash || undef;
+        my $phys  = keys %hash        || undef;
         my $cores = sum(values %hash) || $cpus;
         return $name, $phys, $cores, $cpus;
     }

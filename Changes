@@ -1,4 +1,8 @@
 Revision history for System-CPU
 
+1.01    2023-09-22
+        - Deprecated hw.ncpu only as fallback.
+        - POD and formatting.
+
 1.00    2023-09-21
         First public version.

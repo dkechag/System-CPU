@@ -1,19 +1,15 @@
 # NAME
 
-System::CPU - Cross-platform CPU information / topology with no dependencies
-
-# VERSION
-
-Version 1.00
+System::CPU - Cross-platform CPU information / topology
 
 # SYNOPSIS
 
     use System::CPU;
 
-    # Number of logical cores. E.g. on SMT systems this will be the num of Hyper-Threads
+    # Number of logical cores. E.g. on SMT systems these will be Hyper-Threads
     my $logical_cpu = System::CPU::get_ncpu();
 
-    # For some platforms you can separately get the number of processors/sockets and cores
+    # On some platforms you can also get the number of processors and physical cores
     my ($phys_processors, $phys_cpu, $logical_cpu) = System::CPU::get_cpu();
 
     # Model name of the CPU
@@ -28,7 +24,7 @@ A pure Perl module with no dependencies to get basic CPU information on any plat
 The data you can get differs depending on platform, but for many systems running
 Linux/BSD/MacOS you can get extra nuance like number of threads vs cores etc.
 
-It was created for [Benchmarking::DKbench](https://metacpan.org/pod/Benchmarking%3A%3ADKbench) with the `get_ncpu` function modeled
+It was created for [Benchmark::DKbench](https://metacpan.org/pod/Benchmark%3A%3ADKbench) with the `get_ncpu` function modeled
 after the one on [MCE::Util](https://metacpan.org/pod/MCE%3A%3AUtil). In fact, some code was copied from that function as
 it had the most reliable way to consistently get the logical cpus of the system.
 

@@ -50,6 +50,13 @@ subtest "vms" => sub {
     ) for sort keys %function;
 };
 
+subtest "_uname_m" => sub {
+    $cmd_mock = {"uname -p" => 'arm'};
+    is(System::CPU::_uname_m(), "arm", "uname -p fallback");
+    $cmd_mock = {"uname -x" => 'arm'};
+    is(System::CPU::_uname_m(), "", "No uname -p fallback");
+};
+
 done_testing;
 
 sub run_test {
@@ -87,8 +94,14 @@ CPU implementer : 0x00
 CPU architecture: 8
 CPU variant : 0x0
 CPU part    : 0x000
-CPU revision    : 0
-'], [undef, 2, 2]],
+CPU revision    : 0'], [undef, 2, 2]],
+['linux', 'file', ['/proc/cpuinfo', 'processor   : 0
+core id     : 0
+cpu cores   : 2
+
+processor   : 1
+core id     : 2
+cpu cores   : 2'],[undef, 2, 2]],
 ['linux', 'file', ['/proc/cpuinfo', 'processor   : 0
 physical id : 0
 core id     : 0
@@ -107,8 +120,7 @@ cpu cores   : 1
 processor   : 3
 physical id : 1
 core id     : 0
-cpu cores   : 1
-'],[2, 2, 4]],
+cpu cores   : 1'],[2, 2, 4]],
 ['bsd', 'cmd', {sysctl => ""}, [undef, undef, undef]],
 ['bsd', 'cmd', {ncpu => 10}, [undef, 10, 10]],
 ['darwin', 'cmd', {logicalcpu => 8, physicalcpu => 4}, [undef, 4, 8]],
@@ -133,6 +145,7 @@ proc6 Available 00-06 Processor'}, [undef, undef, 4]],
 ['aix', 'cmd', {pmcycles => 'Cpu 0 runs at 1656 MHz
 Cpu 1 runs at 1656 MHz'}, [undef, undef, 2]],
 ['aix', 'cmd', {lparstat => "Online Virtual CPUs : 1"}, [undef, undef, 1]],
+['aix', 'cmd', {lparstat => "Online Virtual CPUs", pmcycles => 'Cpu 0 runs at 1656 MHz'}, [undef, undef, 1]],
 ['gnu', 'cmd', {none => ""}, [undef, undef, undef]],
 ['gnu', 'cmd', {nproc => 6}, [undef, undef, 6]],
 ['haiku', 'cmd', {none => ""}, [undef, undef, undef]],
@@ -223,6 +236,5 @@ get_arch => [['linux', 'cmd', {uname => 'aarch64'}, ["aarch64"]],
 ['aix', 'cmd', {uname => 'x86_64'}, ["x86_64"]],
 ['cygwin', 'env', ["PROCESSOR_ARCHITECTURE", 'AMD64'], ["AMD64"]],
 ['haiku', 'cmd', {getarch => 'x86'}, ["x86"]],
-],
-};
+]};
 }
