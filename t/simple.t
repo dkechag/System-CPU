@@ -1,11 +1,15 @@
 use Test2::Tools::Exception qw/dies lives/;
 use Test2::V0;
-use Test::MockFile qw(nostrict);
 
 our $cmd_mock;
+our $mockfile;
+
 require System::CPU; # Runtime to set $cmd_mock
 
 BEGIN {
+    eval "use Test::MockFile qw(nostrict);";
+    $mockfile = $@ ? 0 : 1;
+
     *CORE::GLOBAL::readpipe = sub {
         my $cmd   = shift;
         my $match = join "|", keys %$cmd_mock;
@@ -18,7 +22,6 @@ BEGIN {
     };
 }
 
-my $mockfile  = eval "require Test::MockFile";
 my $all_tests = get_tests();
 my %function  = (
     get_cpu  => \&System::CPU::get_cpu,
@@ -32,6 +35,28 @@ foreach my $func (sort keys %function) {
         run_test($_, $function{$func}, $func) for @{$tests};
     };
 }
+
+subtest "get_hash" => sub {
+    local $^O = "darwin";
+    $cmd_mock = {
+        profiler     => 'Hardware',
+        logicalcpu   => 10,
+        physicalcpu  => 10,
+        brand_string => "Apple M2 Pro",
+        uname        => "arm64"
+    };
+    is(
+        System::CPU::get_hash(),
+        {
+            name           => 'Apple M2 Pro',
+            physical_cores => 10,
+            processors     => 1,
+            arch           => 'arm64',
+            logical_cores  => 10
+        },
+        "get_hash"
+    );
+};
 
 subtest "raw" => sub {
     local $^O = "haiku";
@@ -122,8 +147,20 @@ physical id : 1
 core id     : 0
 cpu cores   : 1'],[2, 2, 4]],
 ['bsd', 'cmd', {sysctl => ""}, [undef, undef, undef]],
-['bsd', 'cmd', {ncpu => 10}, [undef, 10, 10]],
-['darwin', 'cmd', {logicalcpu => 8, physicalcpu => 4}, [undef, 4, 8]],
+['bsd', 'cmd', {ncpu => 10, profiler => 'Hardware'}, [1, 10, 10]],
+['darwin', 'cmd', {profiler => 'Hardware:
+
+    Hardware Overview:
+
+      Model Name: Mac Pro
+      Model Identifier: MacPro5,1
+      Processor Name: Quad-Core Intel Xeon
+      Processor Speed: 2,26 GHz
+      Number of Processors: 2
+      Total Number of Cores: 8
+      L2 Cache (per Core): 256 KB
+      L3 Cache (per Processor): 8 MB
+      Memory: 12 GB', logicalcpu => 16, physicalcpu => 8}, [2, 8, 16]],
 ['solaris', 'file', ['/usr/sbin/psrinfo', undef], [undef, undef, undef]],
 ['solaris', 'file', ['/usr/sbin/psrinfo', 1], [undef, undef, undef]],
 ['solaris', 'cmd', {'uname -X' => 'System = SunOS

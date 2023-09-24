@@ -6,7 +6,7 @@ use warnings;
 
 use List::Util qw(sum);
 
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 =head1 NAME
 
@@ -28,6 +28,9 @@ System::CPU - Cross-platform CPU information / topology
  # CPU Architecture
  my $arch = System::CPU::get_arch();
 
+ # Get all the above in a hash
+ my $hash = System::CPU::get_hash();
+
 =head1 DESCRIPTION
 
 A pure Perl module with no dependencies to get basic CPU information on any platform.
@@ -43,18 +46,16 @@ it had the most reliable way to consistently get the logical cpus of the system.
 =head2 get_cpu
 
 Returns as detailed CPU topology as the platform allows. A list of three values
-will be returned, the first and the second possibly C<undef>:
+will be returned, with the first and the second possibly C<undef>:
 
  my ($phys_processors, $phys_cpu, $logical_cpu) = System::CPU::get_cpu();
 
-For many Linux systems, the number of physical processors (sockets), as well as
-the number of physical CPU cores and logical CPUs (CPU threads) will be returned.
+For many Linux, MacOS, BSD systems the number of physical processors (sockets),
+as well as the number of physical CPU cores and logical CPUs (CPU threads) will
+be returned.
 
-For MacOS and BSD, the physical processors (sockets) will be C<undef>, but the
-cores vs threads numbers should still be available for most systems.
-
-For the systems where the extra information is not available (i.e. all other OSes),
-the first two values will be C<undef>.
+For the systems where the extra information is not available (i.e. all other OSes
+and some Linux/MacOS/BSD setups), the first two values will be C<undef>.
 
 =head2 get_ncpu
 
@@ -78,6 +79,21 @@ Returns the CPU model name. By default it will remove some extra spaces and Inte
 Will return the CPU architecture as reported by the system. There is no standarized
 form, e.g. Linux will report aarch64 on a system where Darwin would report arm64
 etc.
+
+=head2 get_hash
+
+ my $hash = System::CPU::get_hash(%opt?);
+
+Will return all the information the module can access in a hash. Accepts the options
+of the other functions. Example hash output:
+
+ {
+    arch           => 'arm64',
+    logical_cores  => 10,
+    name           => 'Apple M2 Pro',
+    physical_cores => 10,
+    processors     => 1
+ }
 
 =head1 CAVEATS
 
@@ -111,6 +127,20 @@ Linux/Android, BSD/MacOS, Win32/Cygwin, AIX, Solaris, IRIX, HP-UX, Haiku, GNU
 and variants of those.
 
 =cut
+
+sub get_hash {
+    my %opt = @_;
+    my ($proc, $phys, $log) = get_cpu(%opt);
+    my $name = get_name(%opt);
+    my $arch = get_arch(%opt);
+    return {
+        processors     => $proc,
+        logical_cores  => $log,
+        physical_cores => $phys,
+        name           => $name,
+        arch           => $arch,
+    };
+}
 
 sub get_cpu {
     return _linux_cpu()   if $^O =~ /linux|android/i;
@@ -192,12 +222,15 @@ sub _solaris_cpu {
 }
 
 sub _bsd_cpu {
+    my $prof = `system_profiler -detailLevel mini SPHardwareDataType SPSoftwareDataType 2>/dev/null`;
+    my $proc = $prof ? 1 : undef;
+    $proc = $1 if $prof && $prof =~ /Number of (?:Processors|CPUs): (\d+)/i;
     chomp(my $cpus = `sysctl -n hw.logicalcpu 2>/dev/null`);
     chomp($cpus    = `sysctl -n hw.ncpu 2>/dev/null`) unless $cpus; # Old system fallback
-    return (undef, undef, undef) unless $cpus;
+    return ($proc, undef, undef) unless $cpus;
     chomp(my $cores = `sysctl -n hw.physicalcpu 2>/dev/null`);
     $cores ||= $cpus;
-    return (undef, $cores, $cpus);
+    return ($proc, $cores, $cpus);
 }
 
 sub _linux_cpu {

@@ -1,5 +1,10 @@
 Revision history for System-CPU
 
+1.02    2023-09-24
+        - get_hash() added.
+        - Processors number for MacOS.
+        - Test::MockFile only for automated testing (cpantesters).
+
 1.01    2023-09-22
         - Deprecated hw.ncpu only as fallback.
         - POD and formatting.

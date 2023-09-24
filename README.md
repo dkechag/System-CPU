@@ -18,6 +18,9 @@ System::CPU - Cross-platform CPU information / topology
     # CPU Architecture
     my $arch = System::CPU::get_arch();
 
+    # Get all the above in a hash
+    my $hash = System::CPU::get_hash();
+
 # DESCRIPTION
 
 A pure Perl module with no dependencies to get basic CPU information on any platform.
@@ -33,18 +36,16 @@ it had the most reliable way to consistently get the logical cpus of the system.
 ## get\_cpu
 
 Returns as detailed CPU topology as the platform allows. A list of three values
-will be returned, the first and the second possibly `undef`:
+will be returned, with the first and the second possibly `undef`:
 
     my ($phys_processors, $phys_cpu, $logical_cpu) = System::CPU::get_cpu();
 
-For many Linux systems, the number of physical processors (sockets), as well as
-the number of physical CPU cores and logical CPUs (CPU threads) will be returned.
+For many Linux, MacOS, BSD systems the number of physical processors (sockets),
+as well as the number of physical CPU cores and logical CPUs (CPU threads) will
+be returned.
 
-For MacOS and BSD, the physical processors (sockets) will be `undef`, but the
-cores vs threads numbers should still be available for most systems.
-
-For the systems where the extra information is not available (i.e. all other OSes),
-the first two values will be `undef`.
+For the systems where the extra information is not available (i.e. all other OSes
+and some Linux/MacOS/BSD setups), the first two values will be `undef`.
 
 ## get\_ncpu
 
@@ -68,6 +69,21 @@ Returns the CPU model name. By default it will remove some extra spaces and Inte
 Will return the CPU architecture as reported by the system. There is no standarized
 form, e.g. Linux will report aarch64 on a system where Darwin would report arm64
 etc.
+
+## get\_hash
+
+    my $hash = System::CPU::get_hash(%opt?);
+
+Will return all the information the module can access in a hash. Accepts the options
+of the other functions. Example hash output:
+
+    {
+       arch           => 'arm64',
+       logical_cores  => 10,
+       name           => 'Apple M2 Pro',
+       physical_cores => 10,
+       processors     => 1
+    }
 
 # CAVEATS
 
