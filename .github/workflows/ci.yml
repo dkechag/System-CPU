@@ -19,7 +19,7 @@ jobs:
           - '5.20'
           - '5.16'
           - '5.12'
-          - '5.8'
+          - '5.10'
 
     container:
       image: perldocker/perl-tester:${{ matrix.perl-version }}
