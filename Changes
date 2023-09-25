@@ -1,5 +1,8 @@
 Revision history for System-CPU
 
+1.03    2023-09-25
+        - Fix Solaris support.
+
 1.02    2023-09-24
         - get_hash() added.
         - Processors number for MacOS.

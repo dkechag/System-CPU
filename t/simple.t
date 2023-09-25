@@ -87,11 +87,15 @@ done_testing;
 sub run_test {
     my ($test, $func, $name) = @_;
 
-    return ok(1, "Skip without Mockfile") if !$mockfile && $test->[1] eq 'file';
+    return ok(1, "Skip without Mockfile")
+        if (!$mockfile || $^O eq 'freebsd') # FreeBSD has issues with Test::MockFile
+        && ($test->[1] eq 'file' || scalar @$test > 4);
 
     local $^O = $test->[0];
 
     my $mock;
+    use Data::Dumper;
+    $mock = Test::MockFile->file(@{$test->[4]}) if scalar @$test > 4;
     $mock = Test::MockFile->file(@{$test->[2]}) if $test->[1] eq 'file';
     $cmd_mock = $test->[1] eq 'cmd' ? $test->[2] : {nullcmd => 0};
     local $ENV{$test->[2]->[0]} = $test->[2]->[1] if $test->[1] eq 'env';
@@ -173,7 +177,7 @@ Serial = <unknown>
 Users = <unknown>
 OEM# = 0
 Origin# = 1
-NumCPU = 4'}, [undef, undef, 4]],
+NumCPU = 4'}, [undef, undef, 4], ['/usr/sbin/psrinfo', undef]],
 ['aix', 'cmd', {lparstat => ""}, [undef, undef, undef]],
 ['aix', 'cmd', {lsdev => 'proc0 Available 00-00 Processor
 proc2 Available 00-02 Processor
@@ -243,6 +247,41 @@ initial apicid  : 0'], ['Intel Xeon Platinum 8481C CPU @ 2.70GHz']],
 CPU: MIPS R4400 Processor Chip Revision: 6.0
 FPU: MIPS R4010 Floating Point Chip Revision: 0.0
 Data cache size: 16 Kbytes"}, ["MIPS R4400 Processor Chip Revision: 6.0"]],
+['solaris', 'cmd', {kstat => 'cpu_info:0:cpu_info0:brand      AMD Ryzen 5 PRO 4650U with Radeon Graphics
+cpu_info:0:cpu_info0:chip_id    0
+cpu_info:0:cpu_info0:clock_MHz  2094
+cpu_info:0:cpu_info0:core_id    0
+cpu_info:0:cpu_info0:cpu_type   i386
+cpu_info:0:cpu_info0:family     23
+cpu_info:0:cpu_info0:fpu_type   i387 compatible
+cpu_info:0:cpu_info0:implementation     x86 (chipid 0x0 AuthenticAMD 860F01 family 23 model 96 step 1 clock 2100 MHz)
+cpu_info:0:cpu_info0:max_ncpu_per_chip  2
+cpu_info:0:cpu_info0:max_ncpu_per_core  1
+cpu_info:0:cpu_info0:model      96
+cpu_info:0:cpu_info0:ncore_per_chip     2
+cpu_info:0:cpu_info0:ncpu_per_chip      2
+cpu_info:0:cpu_info0:pg_id      1
+cpu_info:0:cpu_info0:pkg_core_id        0
+cpu_info:0:cpu_info0:vendor_id  AuthenticAMD
+cpu_info:1:cpu_info1:brand      AMD Ryzen 5 PRO 4650U with Radeon Graphics
+cpu_info:1:cpu_info1:chip_id    0
+cpu_info:1:cpu_info1:class      misc
+cpu_info:1:cpu_info1:clock_MHz  2094
+cpu_info:1:cpu_info1:core_id    1
+cpu_info:1:cpu_info1:cpu_type   i386
+cpu_info:1:cpu_info1:family     23
+cpu_info:1:cpu_info1:fpu_type   i387 compatible
+cpu_info:1:cpu_info1:implementation     x86 (chipid 0x0 AuthenticAMD 860F01 family 23 model 96 step 1 clock 2100 MHz)
+cpu_info:1:cpu_info1:max_ncpu_per_chip  2
+cpu_info:1:cpu_info1:max_ncpu_per_core  1
+cpu_info:1:cpu_info1:max_pwrcap 0
+cpu_info:1:cpu_info1:model      96
+cpu_info:1:cpu_info1:ncore_per_chip     2
+cpu_info:1:cpu_info1:ncpu_per_chip      2
+cpu_info:1:cpu_info1:pg_id      1
+cpu_info:1:cpu_info1:pkg_core_id        1
+cpu_info:1:cpu_info1:vendor_id  AuthenticAMD
+'}, ["AMD Ryzen 5 PRO 4650U with Radeon Graphics"]],
 ['haiku', 'cmd', {sysinfo => 'CPU #0: "Intel(R) Core(TM)2 Duo CPU     T9600  @ 2.80GHz"
 CPU #1: "Intel(R) Core(TM)2 Duo CPU     T9600  @ 2.80GHz"'}, ["Intel Core2 Duo CPU T9600 @ 2.80GHz"]],
 ['hp-ux', 'cmd', {machinfo => 'CPU info:

@@ -6,7 +6,7 @@ use warnings;
 
 use List::Util qw(sum);
 
-our $VERSION = '1.02';
+our $VERSION = '1.03';
 
 =head1 NAME
 
@@ -188,6 +188,9 @@ sub get_name {
         } elsif ($out =~ /\s*\d*\s*(.+(?:MHz|GHz).+)$/m) {
             $name = $1;
         }
+    } elsif ($^O =~ /osf|solaris|sunos|svr5|sco/i) {
+        my $out = `kstat -p cpu_info`;
+        $name = $1 if $out =~ /:brand\s*(.*)$/m;
     } else {
         die "OS identifier '$^O' not recognized. Contact dkechag\@cpan.org to add support.";
     }
